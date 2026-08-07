@@ -8,6 +8,7 @@ description = "macOS 菜单栏自动化工具"
 objc2 = "0.6.2"
 objc2-app-kit = "0.3.2"
 objc2-core-bluetooth = { version = "0.3.2", default-features = false, features = ["CBCentralManager", "CBManager"] }
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["CFNumber", "CFPreferences", "CFString"] }
 objc2-core-wlan = "0.3.2"
 objc2-foundation = "0.3.2"
 

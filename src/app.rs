@@ -14,6 +14,7 @@ use objc2_foundation::{
 };
 
 use crate::automation::{self, Setting};
+use crate::settings::handoff;
 
 #[derive(Debug)]
 struct AppDelegateIvars {
@@ -45,6 +46,16 @@ define_class!(
             let enabled = sender.state() != NSControlStateValueOn;
             sender.setState(menu_state(enabled));
             automation::set_enabled(Setting::WifiOnSleep, enabled);
+        }
+
+        #[unsafe(method(toggleHandoff:))]
+        fn toggle_handoff(&self, sender: &NSMenuItem) {
+            let enabled = sender.state() != NSControlStateValueOn;
+            if let Err(error) = handoff::set_enabled(enabled) {
+                eprintln!("设置接力失败: {error}");
+                return;
+            }
+            sender.setState(menu_state(enabled));
         }
 
         #[unsafe(method(handleWillSleep:))]
@@ -124,6 +135,20 @@ impl AppDelegate {
         wifi_item.setState(menu_state(automation::is_enabled(Setting::WifiOnSleep)));
         unsafe {
             wifi_item.setTarget(Some(self.as_ref()));
+        }
+
+        menu.addItem(&NSMenuItem::separatorItem(mtm));
+
+        let handoff_item = unsafe {
+            menu.addItemWithTitle_action_keyEquivalent(
+                ns_string!("允许在这台 Mac 和 iCloud 设备之间使用“接力”"),
+                Some(sel!(toggleHandoff:)),
+                ns_string!(""),
+            )
+        };
+        handoff_item.setState(menu_state(handoff::is_enabled()));
+        unsafe {
+            handoff_item.setTarget(Some(self.as_ref()));
         }
 
         menu.addItem(&NSMenuItem::separatorItem(mtm));
