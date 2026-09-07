@@ -2,7 +2,10 @@
 name = "macos-automation"
 version = "0.1.0"
 edition = "2024"
-description = "macOS 菜单栏自动化工具"
+rust-version = "1.88"
+description = "使用 Rust 和 AppKit 构建的 macOS 菜单栏自动化工具，支持蓝牙与 Wi-Fi 的睡眠／唤醒自动化，以及系统接力开关。"
+readme = "README.md"
+repository = "https://github.com/dream-image/macos-automation"
 
 [dependencies]
 objc2 = "0.6.2"
@@ -16,4 +19,6 @@ objc2-foundation = "0.3.2"
 name = "MacOS Automation"
 identifier = "com.thousanddream.macos-automation"
 category = "public.app-category.utilities"
+short_description = "macOS 菜单栏自动化与系统设置工具"
+long_description = "通过菜单栏独立配置蓝牙和 Wi-Fi 的睡眠关闭、唤醒开启行为，并直接切换系统接力设置。自动化选项在本机保存，各项系统控制按模块组织。"
 osx_info_plist_exts = ["Info.plist.ext"]

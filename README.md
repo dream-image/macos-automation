@@ -1,58 +1,144 @@
 # macOS Automation
 
-一个使用 Rust 和 AppKit 开发的 macOS 菜单栏自动化工具。
+使用 Rust 和 AppKit 构建的 macOS 菜单栏自动化工具，集中管理日常自动化行为与系统设置。目前支持蓝牙、Wi-Fi 的睡眠／唤醒自动化，以及系统接力（Handoff）开关。
 
-## 功能
+应用以菜单栏齿轮图标运行，没有主窗口，也不显示 Dock 图标。各项系统控制独立实现，方便后续增加其他自动化行为。
 
-- Mac 进入睡眠时自动关闭蓝牙
-- Mac 进入睡眠时自动关闭 Wi-Fi
-- Mac 唤醒后自动恢复已启用的蓝牙和 Wi-Fi
-- 菜单栏直接启用或停用各项行为
-- 自动保存设置
+## 功能与行为
+
+| 菜单项 | 启用后的行为 | 设置保存方式 |
+| --- | --- | --- |
+| 睡眠自动关闭蓝牙 | 收到系统睡眠通知时关闭蓝牙；唤醒约 1 秒后尝试开启 | 应用本地偏好设置 |
+| 睡眠自动关闭 Wi-Fi | 收到系统睡眠通知时关闭 Wi-Fi；唤醒约 1 秒后尝试开启 | 应用本地偏好设置 |
+| 允许在这台 Mac 和 iCloud 设备之间使用“接力” | 点击后直接修改当前用户、当前 Mac 的系统接力偏好设置 | 系统偏好设置 |
+
+- 蓝牙和 Wi-Fi 自动化可独立启用，未保存设置时默认关闭；勾选表示已启用自动化，不代表无线设备当前已打开。
+- **唤醒时会主动开启对应设备，不会恢复睡眠前的状态。** 例如，睡眠前已手动关闭 Wi-Fi，但仍勾选 Wi-Fi 自动化，唤醒后会尝试开启 Wi-Fi。
+- 自动化依赖应用持续运行；退出后不再处理睡眠和唤醒通知。仅关闭屏幕不一定会触发系统睡眠。
+- 接力开关独立于睡眠自动化，退出应用不会撤销已修改的接力设置。
+- 当前未实现登录时自动启动；需要时可自行将应用加入登录项。
 
 ## 开发环境
 
-- macOS
-- Rust 1.85 或更高版本
+- macOS：项目直接调用 Apple 系统框架，不支持 Windows 或 Linux。
+- Rust 1.88 或更高版本，使用 Rust 2024 edition。
+- Xcode Command Line Tools，提供编译和链接所需的系统工具。
 
-## 运行
+代码使用 `if let ... && let ...` 形式的 let chains（条件链），该语法从 [Rust 1.88](https://blog.rust-lang.org/2025/06/26/Rust-1.88.0/) 开始稳定支持，因此仅满足 Rust 2024 edition 的 1.85 版本仍不足以编译本项目。
 
-```bash
-cargo run
-```
-
-## 打包
-
-安装 `cargo-bundle`：
+如未安装 Apple 命令行工具：
 
 ```bash
-cargo install cargo-bundle
+xcode-select --install
 ```
 
-生成 release 应用和 DMG：
+## 获取与运行
 
 ```bash
-cargo bundle --release
+git clone https://github.com/dream-image/macos-automation.git
+cd macos-automation
+cargo run --locked
 ```
 
-输出位置：
+运行后点击菜单栏齿轮图标，勾选需要的自动化行为。`cargo run` 持续占用终端是正常的应用事件循环；可从菜单选择“退出”，或在终端按 `Ctrl+C` 结束进程。
+
+日常使用建议通过打包后的 `.app` 启动，使应用携带 Bundle 标识和蓝牙权限用途说明。
+
+## 打包与安装
+
+安装打包工具：
+
+```bash
+cargo install cargo-bundle --locked
+```
+
+生成 release 应用：
+
+```bash
+cargo bundle --release --format osx
+```
+
+输出：`target/release/bundle/osx/MacOS Automation.app`。
+
+如需 DMG 安装镜像，使用支持 `dmg` 格式的 cargo-bundle（本项目文档核对版本为 0.11.0）：
+
+```bash
+cargo bundle --release --format dmg
+```
+
+输出：`target/release/bundle/dmg/MacOS Automation.dmg`。可用 `cargo bundle --help` 检查本机支持的格式。以上命令显式选择输出格式；本机 0.11.0 版本在省略 `--format` 时会同时生成 `.app` 和 DMG。
+
+在 Finder 中将生成的 `.app` 拖入“应用程序”目录，然后打开它。替换旧版本前，先从菜单栏退出正在运行的应用，避免继续使用旧进程。
+
+也可以直接启动构建产物进行验证：
+
+```bash
+open "target/release/bundle/osx/MacOS Automation.app"
+```
+
+打包命令不等于完成 Developer ID 签名和 Apple 公证；向其他 Mac 分发时需要另外处理。项目没有配置通用二进制（Universal Binary）构建流程，以上命令默认按本机构建目标生成应用。
+
+## 权限与兼容性
+
+### 蓝牙
+
+启用蓝牙自动化时，应用通过 CoreBluetooth 发起权限请求；如果保存的选项已启用，启动时也会初始化权限管理器。`.app` 的权限用途说明来自根目录 `Info.plist.ext`。
+
+实际电源控制使用 IOBluetooth 的私有接口，并在操作后轮询确认状态，最多等待约 2 秒。系统升级可能影响该接口的可用性；项目尚未建立覆盖多个 macOS 版本的兼容性测试矩阵。
+
+### Wi-Fi
+
+通过 CoreWLAN 操作默认 Wi-Fi 接口。接口不存在或系统拒绝操作时，应用会将错误写入标准错误输出；当前没有图形化错误提示或提权流程。
+
+### 接力
+
+通过 CoreFoundation 偏好设置接口写入 `com.apple.coreservices.useractivityd` 的 `ActivityAdvertisingAllowed` 和 `ActivityReceivingAllowed`，随后同步设置并发送变更通知。这些系统内部设置和通知名称可能随 macOS 版本变化。
+
+菜单中的接力状态在应用启动时读取，成功切换后更新；从系统设置等外部位置修改后，当前菜单不会自动刷新，可重启应用重新读取。菜单勾选不能作为跨设备接力或通用剪贴板实际可用的验证结果。
+
+## 常见问题
+
+| 现象 | 检查方式 |
+| --- | --- |
+| 运行后没有窗口，终端一直等待 | 应用常驻菜单栏，查看齿轮图标；这属于正常运行方式 |
+| 睡眠后蓝牙或 Wi-Fi 没有关闭 | 确认对应自动化已勾选、应用仍在运行，且 Mac 实际进入系统睡眠 |
+| 唤醒后原本关闭的 Wi-Fi 被打开 | 当前实现会开启已启用自动化的设备；不需要时取消对应勾选 |
+| 蓝牙操作失败 | 检查系统蓝牙权限，优先使用打包后的 `.app`，再查看错误输出 |
+| 接力菜单与系统设置不一致 | 重启应用重新读取系统状态，并在系统设置中核对 |
+
+调试时使用 `cargo run --locked` 查看标准错误输出。如果需要保留 `.app` 内的配置文件，同时在终端观察其进程输出，可先退出其他实例，再运行：
+
+```bash
+"target/release/bundle/osx/MacOS Automation.app/Contents/MacOS/macos-automation"
+```
+
+该方式用于排查日志，不能替代通过 Finder 启动 `.app` 后的权限与实际行为验证。
+
+## 项目结构
 
 ```text
-target/release/bundle/osx/MacOS Automation.app
-target/release/bundle/dmg/MacOS Automation.dmg
+.
+├── Cargo.toml                包信息、依赖与应用打包配置
+├── Cargo.lock                锁定依赖版本
+├── Info.plist.ext            菜单栏应用标记与蓝牙权限用途说明
+├── README.md                 项目介绍、使用与开发说明
+└── src/
+    ├── main.rs               程序入口
+    ├── app.rs                AppKit 菜单栏 UI、菜单事件与睡眠／唤醒通知
+    ├── automation.rs         自动化选项保存、权限请求与行为调度
+    └── settings/
+        ├── mod.rs            系统设置模块声明
+        ├── bluetooth.rs      蓝牙授权与电源控制
+        ├── wifi.rs           Wi-Fi 电源控制
+        └── handoff.rs        系统接力偏好设置读写与变更通知
 ```
 
-请通过 `.app` 启动应用。直接运行 `target/release/macos-automation` 会由终端承载进程。
+`app.rs` 负责 UI 和系统事件接入，`automation.rs` 负责自动化调度，各个 `settings` 模块封装实际系统操作。新增睡眠自动化行为时，需要同时接入菜单、选项存储和睡眠／唤醒调度；类似接力的即时设置可以由菜单直接调用对应模块。
 
-## 权限
+## 开发检查
 
-启用蓝牙行为时，应用会申请系统蓝牙权限。Wi-Fi 电源控制在系统需要时可能要求管理员授权。
-
-## 代码结构
-
-```text
-src/app.rs                  菜单栏 UI 和睡眠、唤醒事件
-src/automation.rs           设置存储与行为调度
-src/settings/bluetooth.rs   蓝牙控制
-src/settings/wifi.rs        Wi-Fi 控制
+```bash
+cargo check --locked
 ```
+
+编译检查无法验证系统电源状态、权限弹窗或跨设备接力效果。修改这些功能后，需要在目标 Mac 上验证菜单操作、设置保存、睡眠关闭和唤醒开启行为。

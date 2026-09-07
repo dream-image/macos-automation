@@ -1,4 +1,4 @@
 <key>LSUIElement</key>
 <true/>
 <key>NSBluetoothAlwaysUsageDescription</key>
-<string>用于在 Mac 进入睡眠前自动关闭蓝牙。</string>
+<string>用于在启用蓝牙自动化后，于 Mac 睡眠时关闭蓝牙，并在唤醒后重新开启蓝牙。</string>
